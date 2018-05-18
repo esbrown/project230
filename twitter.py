@@ -4,13 +4,27 @@ import h5py
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import sys
+import csv
 from tensorflow.python.framework import ops
-# from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
-#
+from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
+
 # %matplotlib inline
 np.random.seed(1)
 
 class twitterNeuralNet():
+
+    def formatData(self, scrapedFileName, russianFileName):
+        scrapedData = []
+        russianData = []
+        with open(scrapedFileName, 'rU') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                scrapedData.append(row[0])
+        with open(russianFileName, 'rU') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                russianData.append(row[0])
+        return scrapedData, russianData
 
     def shuffleTweets(self, scrapedData, russianData):
         Xcombined = scrapedData + russianData
@@ -113,7 +127,7 @@ class twitterNeuralNet():
         ### START CODE HERE ### (1 line of code)
         cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = logits, labels = labels))
         ### END CODE HERE ###
-    return cost
+        return cost
 
     def model(self, X_train, Y_train, X_test, Y_test, learning_rate = 0.0001, num_epochs = 1500, minibatch_size = 32, print_cost = True):
         """ Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
@@ -209,9 +223,8 @@ class twitterNeuralNet():
 
 def main():
     net = twitterNeuralNet()
-    scrapedData = open()
-    russianData = open()
-    trainX, trainY, devX, devY, testX, testY = net.shuffleTweets(scrapedData, russianData):
+    scrapedData, russianData = net.formatData('regTweets.csv', 'russianTweets.csv')
+    trainX, trainY, devX, devY, testX, testY = net.shuffleTweets(scrapedData, russianData)
     parameters = net.model(trainX, trainY, devX, devY, learning_rate = 0.0001, num_epochs = 1500, minibatch_size = 32, print_cost = True)
 
 if __name__ == "__main__":
