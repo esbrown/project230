@@ -2,6 +2,7 @@ import sys
 import csv
 
 def cleanData(data):
+	maxWords = 50
 	with open(data, 'rU') as csvfile:
 		reader = csv.reader(csvfile)
 		with open('regTweets.csv', 'w') as writecsv:
@@ -10,9 +11,17 @@ def cleanData(data):
 			writer.writeheader()
 			for row in reader:
 				if len(row) == 1:
-					cleanedText = row[0].replace("\"", "") ###get rid of quotation marks
-					wordVec = row[0].split(' ')
-					print wordVec
+					cleanedText = row[0].replace("\"", "") ###get rid of quotation marks and TODO: others?
+					cleanedText = cleanedText.replace("\'", "")
+					cleanedText = cleanedText.replace(".", " ")
+					cleanedText = cleanedText.replace("!", " ")
+					cleanedText = cleanedText.replace("*", " ")
+					cleanedText = cleanedText.replace(",", " ")
+					wordVec = row[0].split()
+					unkTokens = maxWords - len(wordVec)
+					if unkTokens < 0:
+						print 'Increase MaxWords'
+					wordVec = wordVec + ['<UNK>' for i in range(unkTokens)]
 					writer.writerow({'word_vec': wordVec})
 
 if __name__ == "__main__":
