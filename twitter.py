@@ -12,13 +12,23 @@ np.random.seed(1)
 class twitterNeuralNet():
 
     def shuffleTweets(self, scrapedData, russianData):
-        #TODO: figure out Y values
-        dataList = scrapedData + russianData
-        npData = np.array(dataList)
-        np.random.shuffle(npData)
-        np.split(npData, [600, 800, 1000])
-        train, dev, test = npData
-        return train, dev, test #TODO: trainY, devY, testY
+        Xcombined = scrapedData + russianData
+        Ycombined = [0 for i in range(len(scrapedData))] + [1 for i in range(len(russianData))]
+
+        npX = np.array(Xcombined)
+        npY = np.array(Ycombined)
+
+        #shuffle in unison
+        permutation = numpy.random.permutation(len(Xcombined))
+        npX = npX[permutation]
+        npY = npY[permutation]
+
+        numTotal = len(Xcombined)
+        np.split(npX, [.6*numTotal, .8*numTotal, numTotal])
+        np.split(npY, [.6*numTotal, .8*numTotal, numTotal])
+        trainX, devX, testX = npX
+
+        return trainX, trainY, devX, devY, testX, testY
 
 
     def create_placeholders(self, n_x, n_y):
@@ -198,8 +208,8 @@ class twitterNeuralNet():
 
 def main():
     net = twitterNeuralNet()
-    train, dev, test = net.shuffleTweets(scrapedData, russianData):
-    parameters = net.model(X_train, Y_train, X_test, Y_test, learning_rate = 0.0001, num_epochs = 1500, minibatch_size = 32, print_cost = True)
+    trainX, trainY, devX, devY, testX, testY = net.shuffleTweets(scrapedData, russianData):
+    parameters = net.model(trainX, trainY, devX, devY, learning_rate = 0.0001, num_epochs = 1500, minibatch_size = 32, print_cost = True)
 
 if __name__ == "__main__":
     main()
