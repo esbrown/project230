@@ -6,7 +6,7 @@ tweetTexts = []
 with open('randomTweets.json') as f:
     data = json.load(f)
     for tweet in data:
-    	text = unicode(tweet['text']).encode("utf-8")
+    	text = tweet['text'].encode("utf-8").replace('\n', ' ')
     	if len(text) <= 140:
     		tweetTexts.append([text])
 
