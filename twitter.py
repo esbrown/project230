@@ -1,12 +1,12 @@
 import math
 import numpy as np
-import h5py
-import matplotlib.pyplot as plt
+# import h5py
+# import matplotlib.pyplot as plt
 import tensorflow as tf
 import sys
 import csv
 from tensorflow.python.framework import ops
-from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
+# from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
 # %matplotlib inline
 np.random.seed(1)
@@ -27,6 +27,8 @@ class twitterNeuralNet():
         return scrapedData, russianData
 
     def shuffleTweets(self, scrapedData, russianData):
+        scrapedData, russianData = scrapedData[1:1001], russianData[1:1001] #for now only using 1000 from each
+
         Xcombined = scrapedData + russianData
         Ycombined = [0 for i in range(len(scrapedData))] + [1 for i in range(len(russianData))]
 
@@ -34,14 +36,16 @@ class twitterNeuralNet():
         npY = np.array(Ycombined)
 
         #shuffle in unison
-        permutation = numpy.random.permutation(len(Xcombined))
+        permutation = np.random.permutation(len(Xcombined))
         npX = npX[permutation]
         npY = npY[permutation]
 
-        numTotal = len(Xcombined)
-        np.split(npX, [.6*numTotal, .8*numTotal, numTotal])
-        np.split(npY, [.6*numTotal, .8*numTotal, numTotal])
+        # numTotal = len(Xcombined)
+        npX = np.split(npX, [1200, 1600])
+        npY = np.split(npY, [1200, 1600])
+
         trainX, devX, testX = npX
+        trainY, devY, testY = npY
 
         return trainX, trainY, devX, devY, testX, testY
 
