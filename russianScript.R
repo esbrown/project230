@@ -1,0 +1,5 @@
+setwd("~/Desktop/project230")
+tweets = read.csv(file.choose())
+wantedData = as.data.frame(tweets$text)
+colnames(wantedData) = c('tweet')
+write.table(wantedData, './cleanedRussianTweets.csv', row.names = FALSE, col.names = FALSE)
