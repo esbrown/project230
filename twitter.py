@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import sys
 from tensorflow.python.framework import ops
 # from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 #
@@ -208,6 +209,8 @@ class twitterNeuralNet():
 
 def main():
     net = twitterNeuralNet()
+    scrapedData = open()
+    russianData = open()
     trainX, trainY, devX, devY, testX, testY = net.shuffleTweets(scrapedData, russianData):
     parameters = net.model(trainX, trainY, devX, devY, learning_rate = 0.0001, num_epochs = 1500, minibatch_size = 32, print_cost = True)
 

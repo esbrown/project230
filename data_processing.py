@@ -3,7 +3,7 @@ import csv
 
 def cleanData(data):
 	with open(data, 'rU') as csvfile:
-		reader = csv.reader(csvfile, delimiter='*', quotechar='|')
+		reader = csv.reader(csvfile)
 		with open('regTweets.csv', 'w') as writecsv:
 			fieldnames = ['word_vec']
 			writer = csv.DictWriter(writecsv, fieldnames = fieldnames)
