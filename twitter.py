@@ -13,56 +13,136 @@ np.random.seed(1)
 
 class twitterNeuralNet():
 
+    def __init__(self, glovePath):
+        self.glove = self.loadGloveModel(glovePath)
+
+    def loadGloveModel(self, gloveFile):
+        print "Loading Glove Model"
+        f = open(gloveFile,'r')
+        model = {}
+        for line in f:
+            splitLine = line.split()
+            word = splitLine[0]
+            embedding = np.array([float(val) for val in splitLine[1:]])
+            model[word] = embedding
+        print "Done.",len(model)," words loaded!"
+        return model
+
+
+    def random_mini_batches(self, X, Y, mini_batch_size = 64, seed = 0):
+        """ Creates a list of random minibatches from (X, Y)
+        Arguments:
+        X -- input data, of shape (input size, number of examples)
+        Y -- true "label" vector (1 for blue dot / 0 for red dot), of shape (1, number of examples)
+        mini_batch_size -- size of the mini-batches, integer
+
+        Returns:
+        mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y) """
+
+        np.random.seed(seed)            # To make your "random" minibatches the same as ours
+        m = X.shape[1]                  # number of training examples
+        mini_batches = []
+
+        # Step 1: Shuffle (X, Y)
+        permutation = list(np.random.permutation(m))
+        shuffled_X = X[:, permutation]
+        shuffled_Y = Y[:, permutation].reshape((1,m))
+
+        # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
+        num_complete_minibatches = int(math.floor(m/mini_batch_size)) # number of mini batches of size mini_batch_size in your partitionning
+        for k in range(0, num_complete_minibatches):
+            mini_batch_X = shuffled_X[:, k* mini_batch_size : (k+1) * mini_batch_size]
+            mini_batch_Y = shuffled_Y[:, k* mini_batch_size : (k+1) * mini_batch_size]
+    #         first_mini_batch_X = shuffled_X[:, 0 : mini_batch_size]
+    #         second_mini_batch_X = shuffled_X[:, mini_batch_size : 2 * mini_batch_size]
+            mini_batch = (mini_batch_X, mini_batch_Y)
+            mini_batches.append(mini_batch)
+
+        # Handling the end case (last mini-batch < mini_batch_size)
+        if m % mini_batch_size != 0:
+            mini_batch_X = shuffled_X[:, num_complete_minibatches * mini_batch_size : num_complete_minibatches * mini_batch_size + m % mini_batch_size]
+            mini_batch_Y = shuffled_Y[:, num_complete_minibatches * mini_batch_size : num_complete_minibatches * mini_batch_size + m % mini_batch_size]
+            mini_batch = (mini_batch_X, mini_batch_Y)
+            mini_batches.append(mini_batch)
+
+        return mini_batches
+
+
     def formatData(self, scrapedFileName, russianFileName):
         scrapedData = []
         russianData = []
         with open(scrapedFileName, 'rU') as csvfile:
             reader = csv.reader(csvfile)
             for row in reader:
-                scrapedData.append(row[0])
+                # print row[0]
+                # print row[0].replace('[', '').replace(']', '').replace('\'', '').replace(' ', '').split(',')
+                scrapedData.append(row[0].replace('[', '').replace(']', '').replace('\'', '').replace(' ', '').replace('\"', '').split(','))
+
         with open(russianFileName, 'rU') as csvfile:
             reader = csv.reader(csvfile)
             for row in reader:
-                russianData.append(row[0])
+                russianData.append(row[0].replace('[', '').replace(']', '').replace('\'', '').replace(' ', '').replace('\"', '').split(','))
         return scrapedData, russianData
 
     def shuffleTweets(self, scrapedData, russianData):
-        scrapedData, russianData = scrapedData[1:1001], russianData[1:1001] #for now only using 1000 from each
+        print len(scrapedData)
+        scrapedData, russianData = scrapedData[1:1501], russianData[1:1501] #for now only using 1000 from each
+        MAX_LEN = 50
+        NUM_DIMS = 25
 
-        Xcombined = scrapedData + russianData
+        XcombinedInitial = scrapedData + russianData
+        numExamples = len(XcombinedInitial)
         Ycombined = [0 for i in range(len(scrapedData))] + [1 for i in range(len(russianData))]
 
-        npX = np.array(Xcombined)
-        npY = np.array(Ycombined)
+        print 'glove-izing input'
+
+        npX = np.zeros((numExamples, NUM_DIMS * MAX_LEN))
+        for i, x in enumerate(XcombinedInitial):
+            newVec = []
+            for word in x:
+                # print word
+                if word not in self.glove:
+                    newVec = newVec + [0 for j in range(NUM_DIMS)]
+                else:
+                    newVec = newVec + list(self.glove[word])
+            newVec = newVec[:MAX_LEN*NUM_DIMS] ###TODO: FIX
+            npX[i, :] = newVec
+
+        npX = np.transpose(npX)
+        print npX.shape
+        print 'finished glove-izing'
+
+        npY = np.zeros((1, numExamples))
+        npY[0,:] = Ycombined
+        # npY = np.transpose(npY)
+
+        print npX
+        print npY
+        print 'X shape', npX.shape
+        print 'Y shape', npY.shape
 
         #shuffle in unison
-        permutation = np.random.permutation(len(Xcombined))
-        npX = npX[permutation]
-        npY = npY[permutation]
+
+        permutation = list(np.random.permutation(numExamples))
+        npX = npX[:, permutation]
+        npY = npY[:, permutation]
 
         # numTotal = len(Xcombined)
-        npX = np.split(npX, [1200, 1600])
-        npY = np.split(npY, [1200, 1600])
+        npX = np.split(npX, [1200, 1600], axis = 1)
+        npY = np.split(npY, [1200, 1600], axis = 1)
 
         trainX, devX, testX = npX
         trainY, devY, testY = npY
 
+        print 'X shape train', trainX.shape
+        print 'X shape dev', devX.shape
+        print 'X shape test', testX.shape
+
+        print 'Y shape train', trainY.shape
+        print 'Y shape dev', devY.shape
+        print 'Y shape test', testY.shape
+
         return trainX, trainY, devX, devY, testX, testY
-
-
-    def create_placeholders(self, n_x, n_y):
-        """ Creates the placeholders for the tensorflow session.
-        Arguments:
-        n_x -- scalar, size of an image vector (num_px * num_px = 64 * 64 * 3 = 12288)
-        n_y -- scalar, number of classes (from 0 to 5, so -> 6)
-        Returns:
-        X -- placeholder for the data input, of shape [n_x, None] and dtype "float"
-        Y -- placeholder for the input labels, of shape [n_y, None] and dtype "float" """
-        ### START CODE HERE ### (approx. 2 lines)
-        X = tf.placeholder(tf.float32, name="Placeholder_X", shape=(n_x, None))
-        Y = tf.placeholder(tf.float32, name="Placeholder_Y", shape=(n_y, None))
-        ### END CODE HERE ###
-        return X, Y
 
     def initialize_parameters(self):
         """ Initializes parameters to build a neural network with tensorflow. The shapes are:
@@ -75,14 +155,12 @@ class twitterNeuralNet():
         Returns:
         parameters -- a dictionary of tensors containing W1, b1, W2, b2, W3, b3 """
         tf.set_random_seed(1)                   # so that your "random" numbers match ours
-        ### START CODE HERE ### (approx. 6 lines of code)
-        W1 = tf.get_variable("W1", [25,12288], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+        W1 = tf.get_variable("W1", [25,1250], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
         b1 = tf.get_variable("b1", [25,1], initializer = tf.zeros_initializer())
         W2 = tf.get_variable("W2", [12,25], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
         b2 = tf.get_variable("b2", [12,1], initializer = tf.zeros_initializer())
-        W3 = tf.get_variable("W3", [6,12], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
-        b3 = tf.get_variable("b3", [6,1], initializer = tf.zeros_initializer())
-        ### END CODE HERE ###
+        W3 = tf.get_variable("W3", [1,12], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+        b3 = tf.get_variable("b3", [1,1], initializer = tf.zeros_initializer())
         parameters = {"W1": W1,
                       "b1": b1,
                       "W2": W2,
@@ -109,13 +187,11 @@ class twitterNeuralNet():
         W3 = parameters['W3']
         b3 = parameters['b3']
 
-        ### START CODE HERE ### (approx. 5 lines)              # Numpy Equivalents:
         Z1 = tf.add(tf.matmul(W1, X), b1)                                              # Z1 = np.dot(W1, X) + b1
         A1 = tf.nn.relu(Z1)                                              # A1 = relu(Z1)
         Z2 = tf.add(tf.matmul(W2, A1), b2)                                                # Z2 = np.dot(W2, a1) + b2
         A2 = tf.nn.relu(Z2)                                              # A2 = relu(Z2)
-        Z3 = tf.add(tf.matmul(W3, A2), b3)                                               # Z3 = np.dot(W3,Z2) + b3
-        ### END CODE HERE ###
+        Z3 = tf.add(tf.matmul(W3, A2), b3)
         return Z3
 
     def compute_cost(self, Z3, Y):
@@ -126,11 +202,12 @@ class twitterNeuralNet():
         Returns:
         cost - Tensor of the cost function """
         # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
+        print Z3
+        print Y
         logits = tf.transpose(Z3)
         labels = tf.transpose(Y)
-        ### START CODE HERE ### (1 line of code)
-        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = logits, labels = labels))
-        ### END CODE HERE ###
+        cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = logits, labels = labels))
+        print cost
         return cost
 
     def model(self, X_train, Y_train, X_test, Y_test, learning_rate = 0.0001, num_epochs = 1500, minibatch_size = 32, print_cost = True):
@@ -152,31 +229,24 @@ class twitterNeuralNet():
         seed = 3                                          # to keep consistent results
         (n_x, m) = X_train.shape                          # (n_x: input size, m : number of examples in the train set)
         n_y = Y_train.shape[0]                            # n_y : output size
-        costs = []                                        # To keep track of the cost
+        costs = []
+        print 'X_train.shape', (n_x, m)
+        print 'Y_train.shape', n_y
         # Create Placeholders of shape (n_x, n_y)
-        ### START CODE HERE ### (1 line)
-        X, Y = tf.placeholder(tf.float32, name="X", shape=(n_x, None)), tf.placeholder(tf.float32, name="Y", shape=(n_y, None))
-        ### END CODE HERE ###
+        X, Y = tf.placeholder(tf.float32, name="X", shape=(n_x, None)), tf.placeholder(tf.float32, name="Y", shape=(n_y, None)) ##TODO: Fix Y Shape
 
         # Initialize parameters
-        ### START CODE HERE ### (1 line)
-        parameters = initialize_parameters()
-        ### END CODE HERE ###
+        parameters = self.initialize_parameters()
 
         # Forward propagation: Build the forward propagation in the tensorflow graph
-        ### START CODE HERE ### (1 line)
-        Z3 = forward_propagation(X, parameters)
-        ### END CODE HERE ###
+        Z3 = self.forward_propagation(X, parameters)
 
         # Cost function: Add cost function to tensorflow graph
-        ### START CODE HERE ### (1 line)
-        cost = compute_cost(Z3, Y)
-        ### END CODE HERE ###
+        cost = self.compute_cost(Z3, Y)
 
         # Backpropagation: Define the tensorflow optimizer. Use an AdamOptimizer.
-        ### START CODE HERE ### (1 line)
+
         optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate).minimize(cost)
-        ### END CODE HERE ###
 
         # Initialize all the variables
         init = tf.global_variables_initializer()
@@ -190,15 +260,14 @@ class twitterNeuralNet():
                 epoch_cost = 0.                       # Defines a cost related to an epoch
                 num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
                 seed = seed + 1
-                minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
+                minibatches = self.random_mini_batches(X_train, Y_train, minibatch_size, seed)
                 for minibatch in minibatches:
                     # Select a minibatch
                     (minibatch_X, minibatch_Y) = minibatch
                     # IMPORTANT: The line that runs the graph on a minibatch.
                     # Run the session to execute the "optimizer" and the "cost", the feedict should contain a minibatch for (X,Y).
-                    ### START CODE HERE ### (1 line)
+
                     _ , minibatch_cost = sess.run([optimizer, cost], feed_dict={X: minibatch_X, Y: minibatch_Y})
-                    ### END CODE HERE ###
                     epoch_cost += minibatch_cost / num_minibatches
                 # Print the cost every epoch
                 if print_cost == True and epoch % 100 == 0:
@@ -206,15 +275,19 @@ class twitterNeuralNet():
                 if print_cost == True and epoch % 5 == 0:
                     costs.append(epoch_cost)
             # plot the cost
-            plt.plot(np.squeeze(costs))
-            plt.ylabel('cost')
-            plt.xlabel('iterations (per tens)')
-            plt.title("Learning rate =" + str(learning_rate))
-            plt.show()
+            # plt.plot(np.squeeze(costs))
+            # plt.ylabel('cost')
+            # plt.xlabel('iterations (per tens)')
+            # plt.title("Learning rate =" + str(learning_rate))
+            # plt.show()
             # lets save the parameters in a variable
             parameters = sess.run(parameters)
             print ("Parameters have been trained!")
             # Calculate the correct predictions
+            # print tf.argmax(Z3), tf.argmax(Y)
+            # j = tf.Print(Z3, [Z3])
+            # k = tf.add(j, [Y])
+            # k.eval()
             correct_prediction = tf.equal(tf.argmax(Z3), tf.argmax(Y))
             # Calculate accuracy on the test set
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
@@ -226,10 +299,11 @@ class twitterNeuralNet():
 
 
 def main():
-    net = twitterNeuralNet()
+    net = twitterNeuralNet('glove/glove.twitter.27B.25d.txt')
+
     scrapedData, russianData = net.formatData('regTweets.csv', 'russianTweets.csv')
     trainX, trainY, devX, devY, testX, testY = net.shuffleTweets(scrapedData, russianData)
-    parameters = net.model(trainX, trainY, devX, devY, learning_rate = 0.0001, num_epochs = 1500, minibatch_size = 32, print_cost = True)
+    parameters = net.model(trainX, trainY, devX, devY, learning_rate = 0.0001, num_epochs = 100, minibatch_size = 32, print_cost = True)
 
 if __name__ == "__main__":
     main()
