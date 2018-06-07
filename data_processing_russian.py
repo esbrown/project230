@@ -1,5 +1,6 @@
 import sys
 import csv
+import nltk
 
 def cleanData(data):
 	maxWords = 50
@@ -11,13 +12,10 @@ def cleanData(data):
 			writer.writeheader()
 			for row in reader:
 				if len(row) == 1:
-					cleanedText = row[0].replace("\"", "") ###get rid of quotation marks
+					cleanedText = row[0].replace("\"", "") ###get rid of quotation marks and TODO: others?
 					cleanedText = cleanedText.replace("\'", "")
-					cleanedText = cleanedText.replace(".", " ")
-					cleanedText = cleanedText.replace("!", " ")
 					cleanedText = cleanedText.replace("*", " ")
-					cleanedText = cleanedText.replace(",", " ")
-					wordVec = row[0].split()
+					wordVec = ntlk.word_tokenize(cleanedText)
 					unkTokens = maxWords - len(wordVec)
 					if unkTokens < 0:
 						print 'Increase MaxWords'
