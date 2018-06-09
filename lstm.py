@@ -5,6 +5,7 @@ import numpy as np
 # import tensorflow as tf
 import sys
 import csv
+# import keras
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Activation, Input
 from keras.layers import Embedding
@@ -19,7 +20,7 @@ class twitterNeuralNet():
 
     def __init__(self, glovePath):
         self.glove = self.loadGloveModel(glovePath)
-        self.NUM_DIMS = 25
+        self.NUM_DIMS = 200
         self.MAX_WORDS_IN_TWEET = 60
 
     def loadGloveModel(self, gloveFile):
@@ -49,15 +50,18 @@ class twitterNeuralNet():
         return scrapedData, russianData
 
     def shuffleTweets(self, scrapedData, russianData):
-        scrapedData, russianData = scrapedData[1:1001], russianData[1:1001]
+        print(len(scrapedData), len(russianData))
+        scrapedData, russianData = scrapedData[1:50000], russianData[1:25000]
         labels = [0 for i in range(len(scrapedData))] + [1 for i in range(len(russianData))]
         texts = scrapedData + russianData
+
+        numData = len(labels)
 
         tokenizer = Tokenizer()
         tokenizer.fit_on_texts(texts)
         sequences = tokenizer.texts_to_sequences(texts)
         word_index = tokenizer.word_index
-        
+
         data = pad_sequences(sequences, maxlen=self.MAX_WORDS_IN_TWEET)
         labels = np.asarray(labels)
         print('Shape of data tensor:', data.shape)
@@ -68,8 +72,8 @@ class twitterNeuralNet():
         labels = labels[permutation]
         print(labels.shape)
 
-        trainX, devX, testX = np.split(data, [1400, 1700,], axis = 0)
-        trainY, devY, testY = np.split(labels, [1400, 1700,], axis = 0)
+        trainX, devX, testX = np.split(data, [int(numData * .92), int(numData * .96),], axis = 0)
+        trainY, devY, testY = np.split(labels, [int(numData * .92), int(numData * .96),], axis = 0)
         print(trainY.shape)
 
         embedding_matrix = np.zeros((len(word_index) + 1, self.NUM_DIMS))
@@ -86,33 +90,51 @@ class twitterNeuralNet():
         model = Sequential()
 
         model.add(Embedding(len(word_index) + 1, self.NUM_DIMS, input_length=self.MAX_WORDS_IN_TWEET, weights=[embedding_matrix], trainable = False))
-        model.add(LSTM(100))
-        model.add(Dense(1, activation='sigmoid'))
-        model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-        model.fit(trainX, trainY, batch_size = 128, epochs = 5, shuffle = True)
-        scores = model.evaluate(devX, devY, verbose=0)
-        scores_2 = model.evaluate(testX, testY, verbose=0)
-        print("Accuracy: %.2f%%" % (scores[1]*100))
-        print("Accuracy: %.2f%%" % (scores_2[1]*100))
 
+        ### regular LSTM
+        # model.add(LSTM(100))
+        # model.add(Dense(1, activation='sigmoid'))
+        # model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-    # def train(self, trainX, trainY, devX, devY):
-    #     model = Sequential()
-    #     model.add(LSTM(100))
-    #     model.add(Dense(64))
-    #     model.add(Dropout(.4))
-    #     model.add(Activation('relu'))
-    #     model.add(Dense(1))
-    #     model.add(Activation('sigmoid'))
-    #     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    #     model.fit(trainX, trainY, batch_size = 128, epochs = 5, shuffle = True)
+        LSTMNodes = [25, 200]
+        DenseNodes = [16, 32]
+        DropoutNums = [.2, .4]
+        batchSizes = [32, 64]
+
+        best = 0
+        params = (None, None, None, None)
+        with open('hyperParams.csv', 'w') as writecsv:
+            fieldnames = ['loss','test_acc', 'lstm', 'dense', 'dropout', 'batchsize']
+            writer = csv.DictWriter(writecsv, fieldnames = fieldnames)
+            writer.writeheader()
+            for lstm in LSTMNodes:
+                for dense in DenseNodes:
+                    for dropout in DropoutNums:
+                        for batchsize in batchSizes:
+                            model = Sequential()
+                            model.add(Embedding(len(word_index) + 1, self.NUM_DIMS, input_length=self.MAX_WORDS_IN_TWEET, weights=[embedding_matrix], trainable = False))
+                            model.add(LSTM(lstm))
+                            model.add(Dense(dense))
+                            model.add(Dropout(dropout))
+                            model.add(Activation('relu'))
+                            model.add(Dense(1))
+                            model.add(Activation('sigmoid'))
+                            model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+                            model.fit(trainX, trainY, batch_size = batchsize, epochs = 10, shuffle = True, validation_data = (devX, devY))
+                            scores_2 = model.evaluate(testX, testY, verbose=0)
+                            print("Accuracy: %.2f%%" % (scores_2[1]*100))
+                            print('loss: ', scores_2[0], 'lstm nodes: ', lstm, 'dense nodes: ', dense, 'dropout rate: ', dropout, 'mini batch size: ', batchsize)
+                            if scores_2[1]*100 > best:
+                                params = (lstm, dense, dropout, batchsize)
+
+                            writer.writerow({'loss': scores_2[0],'test_acc': scores_2[1]*100, 'lstm': lstm, 'dense':dense, 'dropout':dropout, 'batchsize':batchsize})
+        print('Best Model: ', params, 'Accuracy: ', best)
 
 
 def main():
-    net = twitterNeuralNet('glove/glove.twitter.27B.25d.txt')
-    scrapedData, russianData = net.formatData('regTweets.csv', 'russianTweets.csv')
+    net = twitterNeuralNet('glove/glove.twitter.27B.200d.txt')
+    scrapedData, russianData = net.formatData('electionTweets.csv', 'russianTweets.csv')
     net.shuffleTweets(scrapedData, russianData)
-    # model = net.train(trainX, trainY, devX, devY)
 
 if __name__ == "__main__":
     main()
